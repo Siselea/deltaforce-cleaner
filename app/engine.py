@@ -255,7 +255,8 @@ def scan(cfg: dict | None = None, progress: Callable[[str], None] | None = None)
                 if "delta force" in blob or "三角洲" in blob or "delta_force" in leaf:
                     if "anticheatexpert" in leaf:
                         continue
-                    res.items.append(Item("regkey", f"游戏卸载项 {sub.rsplit('\\', 1)[-1]}", sub))
+                    leaf = sub.rsplit("\\", 1)[-1]
+                    res.items.append(Item("regkey", f"游戏卸载项 {leaf}", sub))
 
         # Start-menu folders / desktop shortcuts.
         for menu in (

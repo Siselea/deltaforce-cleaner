@@ -13,6 +13,23 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "app
 import engine  # noqa: E402
 
 
+def _setup_output() -> None:
+    """Make console output safe on every code page.
+
+    Windows consoles default to GBK, CI runners to cp1252; neither can encode all of
+    this tool's messages. Prefer UTF-8 and fall back to replace-on-error so printing
+    never aborts a cleanup half-way.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            try:
+                stream.reconfigure(errors="replace")
+            except Exception:
+                pass
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="三角洲行动 卸载工具（命令行）")
     ap.add_argument("--cli", action="store_true", help="命令行模式")
@@ -22,6 +39,7 @@ def main(argv=None):
     ap.add_argument("--no-wegame", action="store_true", help="跳过 WeGame")
     ap.add_argument("--yes", action="store_true", help="跳过确认")
     args = ap.parse_args(argv)
+    _setup_output()
 
     cfg = {
         "include": {
@@ -30,7 +48,8 @@ def main(argv=None):
             "wegame": not args.no_wegame,
         }
     }
-    print(f"管理员权限: {'是' if engine.is_admin() else '否'}")
+    admin_text = "是" if engine.is_admin() else "否"
+    print(f"管理员权限: {admin_text}")
     res = engine.scan(cfg)
     if not res.items:
         for n in res.notes:
@@ -51,7 +70,13 @@ def main(argv=None):
     if not args.yes:
         if not engine.is_admin():
             print("\n警告：非管理员运行，ACE 相关操作可能失败。")
-        if input("\n确认永久删除以上全部内容？输入 yes 继续：").strip().lower() != "yes":
+        try:
+            answer = input("\n确认永久删除以上全部内容？输入 yes 继续：").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            # No usable stdin (piped, CI, or Ctrl+C): never promise to continue.
+            print("\n没有可用的交互终端，已安全中止。无人值守执行请加 --yes。")
+            return 2
+        if answer != "yes":
             print("已取消。")
             return 1
 
